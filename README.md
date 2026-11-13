@@ -14,7 +14,7 @@ Always start with `--dry-run` and read the code before trading real money.
 - Adapters behind `src/ports.py`: live `src/polymarket.py`, `src/telegram.py`, `src/geoblock.py`; dry-run
   `src/paper.py` plus a stdout notifier. `src/runner.py` wires them to the core.
 - `replays/`: sample JSONL replays for `--dry-run`, also used as end-to-end test fixtures.
-- `scripts/authorize_session_key.py`: one-off trading approvals and session key setup.
+- `scripts/authorize_session_key.py`: one-off session key setup.
 - `tests/`: core rules, parsing, rendering, paper exchange, end-to-end replays.
 
 ## How it works
@@ -46,13 +46,14 @@ Trigger orders live in memory only. A restart forgets them, and every start list
 3. Run the one-off script with the owner key in the process environment (never in `.env`):
 
    ```bash
-   OWNER_PRIVATE_KEY=... POLYMARKET_RELAYER_API_KEY=... POLYMARKET_RELAYER_API_KEY_ADDRESS=... \
+   OWNER_PRIVATE_KEY=... POLYMARKET_WALLET=... POLYMARKET_RELAYER_API_KEY=... POLYMARKET_RELAYER_API_KEY_ADDRESS=... \
      uv run scripts/authorize_session_key.py
    ```
 
-   It first sets the trading approvals, including the Protocol V2 approvals that a session key cannot set itself.
-   Then it authorizes a new CLOB-only session key and prints the `POLYMARKET_PRIVATE_KEY` and `POLYMARKET_WALLET`
-   lines for `.env`.
+   `POLYMARKET_WALLET` is the wallet address from the polymarket.com profile menu. The script authorizes a new
+   CLOB-only session key and prints the `POLYMARKET_PRIVATE_KEY` and `POLYMARKET_WALLET` lines for `.env`.
+   Trading approvals, including the Protocol V2 ones a session key cannot set itself, come from accepting the
+   approval prompts in the Polymarket app.
 4. `cp .env.example .env` and fill it in.
 
 ## Configuration
