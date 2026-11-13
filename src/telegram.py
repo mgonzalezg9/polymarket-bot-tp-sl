@@ -4,13 +4,17 @@ from collections.abc import AsyncIterator, Sequence
 
 import httpx
 
-from constants import READ_TIMEOUT_SECONDS, TELEGRAM_LONG_POLL_SECONDS, TELEGRAM_MAX_MESSAGE_LENGTH
+from constants import (
+    READ_TIMEOUT_SECONDS,
+    TELEGRAM_LONG_POLL_SECONDS,
+    TELEGRAM_MAX_MESSAGE_LENGTH,
+    TELEGRAM_RETRY_SECONDS,
+)
 from src.format import EMOJI_BACKLOG
 
 logger = logging.getLogger(__name__)
 
 TELEGRAM_API_BASE = "https://api.telegram.org"
-RETRY_DELAY_SECONDS = 5
 
 
 def split_message(text: str) -> list[str]:
@@ -43,7 +47,7 @@ class TelegramNotifier:
         while True:
             updates = await self._get_updates(offset, TELEGRAM_LONG_POLL_SECONDS)
             if updates is None:
-                await asyncio.sleep(RETRY_DELAY_SECONDS)
+                await asyncio.sleep(TELEGRAM_RETRY_SECONDS)
                 continue
             for update in updates:
                 offset = update["update_id"] + 1
@@ -57,7 +61,7 @@ class TelegramNotifier:
         # offset=-1 returns only the newest update and drops the older ones; retry until it succeeds,
         # otherwise the next poll would replay the backlog.
         while (updates := await self._get_updates(-1, 0)) is None:
-            await asyncio.sleep(RETRY_DELAY_SECONDS)
+            await asyncio.sleep(TELEGRAM_RETRY_SECONDS)
         if not updates:
             return None
         chat_id, _ = _message(updates[-1])

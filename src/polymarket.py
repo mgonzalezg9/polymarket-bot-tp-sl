@@ -28,6 +28,7 @@ from polymarket.streams import (
     MarketTickSizeChangeEvent,
 )
 
+from constants import STREAM_RETRY_SECONDS
 from src.core import (
     BalanceFetchFailed,
     BalanceLoaded,
@@ -53,7 +54,6 @@ from src.parse import MarketRef
 
 logger = logging.getLogger(__name__)
 
-STREAM_RETRY_SECONDS = 5
 EPOCH = datetime(1970, 1, 1, tzinfo=UTC)
 
 
