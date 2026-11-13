@@ -1,0 +1,13 @@
+{"type":"market","asset_id":"8800451236","slug":"gpt-6-released-in-2026","outcome":"Yes","tick_size":"0.01","min_order_size":"5"}
+{"type":"position","asset_id":"8800451236","size":"200","avg_price":"0.40"}
+{"type":"collateral","usdc":"500"}
+{"type":"book","ts":1794492000000,"asset_id":"8800451236","bids":[["0.62","300"],["0.60","500"]],"asks":[["0.64","200"]],"last_trade_price":"0.63"}
+{"type":"command","ts":1794492001000,"text":"/tp gpt-6-released-in-2026 yes 0.70 0.68 120"}
+{"type":"command","ts":1794492002000,"text":"/sl gpt-6-released-in-2026 yes 0.30 0.25 100"}
+{"type":"book","ts":1794492005000,"asset_id":"8800451236","bids":[["0.65","250"],["0.63","400"]],"asks":[["0.67","200"]],"last_trade_price":"0.66"}
+{"type":"command","ts":1794492006000,"text":"/orders"}
+{"type":"book","ts":1794492010000,"asset_id":"8800451236","bids":[["0.68","200"],["0.66","400"]],"asks":[["0.69","150"]],"last_trade_price":"0.68"}
+{"type":"book","ts":1794492015000,"asset_id":"8800451236","bids":[["0.71","40"],["0.69","30"],["0.66","500"]],"asks":[["0.72","100"]],"last_trade_price":"0.71"}
+{"type":"command","ts":1794492031000,"text":"/positions"}
+{"type":"book","ts":1794492035000,"asset_id":"8800451236","bids":[["0.70","200"],["0.68","300"]],"asks":[["0.72","150"]],"last_trade_price":"0.70"}
+{"type":"command","ts":1794492037000,"text":"/orders"}
