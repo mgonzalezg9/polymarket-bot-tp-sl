@@ -107,6 +107,7 @@ on `/tp`, pass the floor too.
   notifies you and cancels the trigger.
 - Omitting `shares` protects the whole position, measured when the trigger fires.
 - The take-profit floor defaults to the trigger price.
+- `/open` refuses a buy below the market's min order size (`usdc / max_price` shares, usually 5).
 - `/edit` works only while a trigger is armed. Ids accept `3` or `#3`.
 
 Sample alerts from `replays/sl_gap.jsonl` (a stop-loss sells through a data gap, an `alert` stop-loss only warns):

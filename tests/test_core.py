@@ -950,6 +950,24 @@ def test_open_position_rounds_max_price_down_and_averages_the_fill():
     assert commands == [Notify(CHAT_ID, "✅ /open will-x-happen Yes: bought 40 @ 0.5 for 20 USDC")]
 
 
+def test_open_position_below_min_order_size_is_refused():
+    state = running_state_with_position()
+
+    refused_state, commands = step(state, market_request(OpenPosition(MARKET_REF, Decimal("1"), Decimal("0.70"))))
+
+    assert commands == [
+        Notify(
+            CHAT_ID,
+            "❌ /open will-x-happen Yes: min order size is 5 shares, at max price 0.70 that needs at least 3.50 USDC",
+        )
+    ]
+    assert refused_state.pending_orders == {}
+
+    _, commands = step(state, market_request(OpenPosition(MARKET_REF, Decimal("3.50"), Decimal("0.70"))))
+
+    assert of_type(commands, SendBuyOrder) == [SendBuyOrder("r1", ASSET_ID, Decimal("3.50"), Decimal("0.70"))]
+
+
 def test_open_position_zero_fill_is_reported_not_retried():
     state, _ = step(
         running_state_with_position(), market_request(OpenPosition(MARKET_REF, Decimal("20"), Decimal("0.56")))

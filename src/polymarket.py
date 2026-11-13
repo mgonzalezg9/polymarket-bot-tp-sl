@@ -84,7 +84,7 @@ def order_rejection_code(error: RequestRejectedError) -> str:
         return "not_enough_balance"
     if "no orders found to match with fak order" in message:
         return "fak_not_filled"
-    return error.code or "unknown"
+    return error.code or str(error) or "unknown"
 
 
 def not_posted(at_ms: int, request_id: str, code: str, error: Exception) -> OrderRejected:

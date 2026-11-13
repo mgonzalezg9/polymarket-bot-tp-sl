@@ -910,11 +910,19 @@ def _cancel_trigger(state: State, chat_id: int, trigger_id: int) -> Result:
 def _open_position(state: State, event: UserRequestReceived, request: OpenPosition) -> Result:
     market = event.market
     max_price = round_down_to_tick(request.max_price, market.tick_size)
+    label = _label(state, market.asset_id)
+    # A market BUY sizes as usdc / max_price shares, which the CLOB checks against the book's min_order_size.
+    min_usdc = market.min_order_size * max_price
+    if request.amount_usdc < min_usdc:
+        text = (
+            f"{fmt.EMOJI_FAILED} /open {label}: min order size is {market.min_order_size} shares, "
+            f"at max price {max_price} that needs at least {min_usdc} USDC"
+        )
+        return state, [Notify(event.chat_id, text)]
     state, request_id = _new_request_id(state)
     pending = PendingOrder(
         request_id, market.asset_id, "BUY", sent_at_ms=event.at_ms, trigger_id=None, reply_chat_id=event.chat_id
     )
-    label = _label(state, market.asset_id)
     return _put_pending(state, pending), [
         SendBuyOrder(request_id, market.asset_id, request.amount_usdc, max_price),
         Notify(
