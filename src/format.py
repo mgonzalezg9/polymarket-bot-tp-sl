@@ -109,7 +109,7 @@ def render_health(state: State, now_ms: int) -> str:
     )
 
 
-def render_positions(state: State) -> str:
+def render_positions(state: State, now_ms: int) -> str:
     active = _active_triggers(state)
     lines = [f"{EMOJI_POSITIONS} Positions"]
     total_value = total_cost = Decimal(0)
@@ -122,8 +122,9 @@ def render_positions(state: State) -> str:
             mark = "no bid"
         else:
             mark = format_price(book.best_bid)
-            if asset_id in state.stale_assets:
-                mark += f" (stale, from {format_timestamp(book.received_at_ms)})"
+            age_ms = now_ms - book.received_at_ms
+            if age_ms > state.config.stale_ms:
+                mark += f" ({format_duration(age_ms)} old)"
         triggers = [format_trigger(trigger) for trigger in active if trigger.asset_id == asset_id]
         lines += [
             market_label(state.markets.get(asset_id), asset_id),

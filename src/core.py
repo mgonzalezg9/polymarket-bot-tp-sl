@@ -128,6 +128,7 @@ class State:
     probe_sent_at_ms: dict[str, int] = field(default_factory=dict)
     last_heartbeat_ms: int = 0
     positions_fetch_attempts: int = 0
+    positions_retry_due: bool = False
     next_trigger_id: int = 1
     next_request_id: int = 1
 
@@ -511,8 +512,7 @@ def _on_positions_fetch_failed(state: State, event: PositionsFetchFailed) -> Res
     attempts = state.positions_fetch_attempts + 1
     state = replace(state, positions_fetch_attempts=attempts)
     if attempts < POSITIONS_FETCH_MAX_ATTEMPTS:
-        # ponytail: retried immediately; spacing it to the next Ticked needs a "retry due" field in State.
-        return state, [FetchPositions(None)]
+        return replace(state, positions_retry_due=True), []
     return state, [
         Notify(None, f"{fmt.EMOJI_FAILED} Positions fetch failed {attempts} times: {event.error} — exiting"),
         Exit(1),
@@ -539,7 +539,7 @@ def _on_positions_loaded(state: State, event: PositionsLoaded) -> Result:
     )
     commands: list[Command] = [Subscribe(new_assets)] if new_assets else []
     if state.status != BotStatus.RECONCILING:
-        return state, [*commands, Notify(event.reply_chat_id, fmt.render_positions(state))]
+        return state, [*commands, Notify(event.reply_chat_id, fmt.render_positions(state, event.at_ms))]
     unprotected = [
         f"{_label(state, asset_id)} ({position.size} shares)"
         for asset_id, position in state.positions.items()
@@ -553,6 +553,8 @@ def _on_positions_loaded(state: State, event: PositionsLoaded) -> Result:
 
 
 def _on_ticked(state: State, at_ms: int) -> Result:
+    if state.status == BotStatus.RECONCILING and state.positions_retry_due:
+        return replace(state, positions_retry_due=False), [FetchPositions(None)]
     if state.status not in LIVE_STATUSES:
         return state, []
     state, stale_commands = _check_staleness(state, at_ms)

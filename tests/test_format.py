@@ -61,7 +61,7 @@ def test_render_positions_values_each_position_and_totals():
         },
     )
 
-    text = render_positions(state)
+    text = render_positions(state, T0_MS + 45_000)
 
     assert text.startswith(EMOJI_POSITIONS)
     assert "100 shares · avg 0.55 · mark 0.52" in text
@@ -69,6 +69,7 @@ def test_render_positions_values_each_position_and_totals():
     assert "triggers: #1 SL 0.45/0.40 all, #2 TP 0.80/0.78 50" in text
     assert "#3" not in text
     assert "10 shares · avg 0.30 · mark no bid" in text
+    assert "mark 0.52 (45s old)" in text
     assert "value 0.00 · PnL -3.00 (-100.00%)" in text
     assert "triggers: none (unprotected)" in text
     assert "Total value 52.00 · cost 58.00 · PnL -6.00 (-10.34%)" in text

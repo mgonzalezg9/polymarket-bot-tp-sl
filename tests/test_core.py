@@ -138,6 +138,8 @@ def test_positions_fetch_failures_exit_1_after_max_attempts():
     state = make_state(status=BotStatus.RECONCILING)
     for _ in range(POSITIONS_FETCH_MAX_ATTEMPTS - 1):
         state, commands = step(state, PositionsFetchFailed(at_ms=T0_MS, error="502"))
+        assert commands == []
+        state, commands = step(state, Ticked(at_ms=T0_MS + 1000))
         assert commands == [FetchPositions(None)]
 
     state, commands = step(state, PositionsFetchFailed(at_ms=T0_MS, error="502"))
