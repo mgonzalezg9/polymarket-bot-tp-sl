@@ -9,6 +9,7 @@ from constants import (
     TELEGRAM_LONG_POLL_SECONDS,
     TELEGRAM_MAX_MESSAGE_LENGTH,
     TELEGRAM_RETRY_SECONDS,
+    TELEGRAM_SEND_MAX_ATTEMPTS,
 )
 from src.format import EMOJI_BACKLOG
 
@@ -30,17 +31,29 @@ class TelegramNotifier:
     async def send(self, chat_id: int | None, text: str) -> None:
         for target in self._chat_ids if chat_id is None else (chat_id,):
             for chunk in split_message(text):
-                try:
-                    response = await self._client.post(
-                        f"{self._base_url}/sendMessage",
-                        json={"chat_id": target, "text": chunk},
-                        timeout=READ_TIMEOUT_SECONDS,
-                    )
-                    if response.status_code != 200:
-                        logger.warning("sendMessage to %s failed: %s %s", target, response.status_code, response.text)
-                # Never log the exception's request URL: it contains the bot token.
-                except Exception as error:
-                    logger.warning("sendMessage to %s failed: %s", target, type(error).__name__)
+                await self._send_chunk(target, chunk)
+
+    async def _send_chunk(self, target: int, chunk: str) -> None:
+        for attempt in range(1, TELEGRAM_SEND_MAX_ATTEMPTS + 1):
+            if attempt > 1:
+                await asyncio.sleep(TELEGRAM_RETRY_SECONDS)
+            # Never log the exception's request URL: it contains the bot token.
+            try:
+                response = await self._client.post(
+                    f"{self._base_url}/sendMessage",
+                    json={"chat_id": target, "text": chunk},
+                    timeout=READ_TIMEOUT_SECONDS,
+                )
+                if response.status_code != 200:
+                    logger.warning("sendMessage to %s failed: %s %s", target, response.status_code, response.text)
+                return
+            # A failed connect never reached Telegram, so resending cannot duplicate the message.
+            except (httpx.ConnectError, httpx.ConnectTimeout) as error:
+                name = type(error).__name__
+                logger.warning("sendMessage to %s failed: %s (attempt %d/%d)", target, name, attempt, TELEGRAM_SEND_MAX_ATTEMPTS)
+            except Exception as error:
+                logger.warning("sendMessage to %s failed: %s", target, type(error).__name__)
+                return
 
     async def requests(self) -> AsyncIterator[tuple[int, str]]:
         offset = await self._skip_backlog()
