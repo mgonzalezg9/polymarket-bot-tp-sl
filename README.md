@@ -108,6 +108,18 @@ on `/tp`, pass the floor too.
 - The take-profit floor defaults to the trigger price.
 - `/edit` works only while a trigger is armed. Ids accept `3` or `#3`.
 
+Sample alerts from `replays/sl_gap.jsonl` (a stop-loss sells through a data gap, an `alert` stop-loss only warns):
+
+```
+🎯 SL #1 armed — fed-cuts-rates-in-december Yes: trigger 0.45, floor 0.40, size all, gap policy sell
+🟠 Stale data: fed-cuts-rates-in-december Yes, btc-above-100k-on-dec-31 No
+🟢 Data fresh again
+⚠️ SL #2 btc-above-100k-on-dec-31 No gapped: bid 0.38 vs trigger 0.50 — not selling. /close or re-arm
+⚡ SL #1 fed-cuts-rates-in-december Yes triggered: bid 0.42 vs trigger 0.45
+📤 SL #1 fed-cuts-rates-in-december Yes: selling 100 shares, floor 0.40
+✅ SL #1 fed-cuts-rates-in-december Yes: sold 100 @ 0.416 for 41.60 USDC
+```
+
 Sample `/orders` reply:
 
 ```
