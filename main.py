@@ -15,6 +15,7 @@ from polymarket import AsyncSecureClient, RequestRejectedError
 from src.core import CoreConfig
 from src.format import EMOJI_HALTED
 from src.geoblock import HttpGeoblock, SkippedGeoblock
+from src.paper import PaperExchange, read_replay
 from src.polymarket import PolymarketAdapter
 from src.runner import Adapters, run_live, run_replay
 from src.telegram import StdoutNotifier, TelegramNotifier
@@ -78,8 +79,6 @@ def adapters(client, http_client, notifier, record_file) -> Adapters:
 
 
 def dry_run(replay_path: str) -> int:
-    from src.paper import PaperExchange, read_replay
-
     paper = PaperExchange()
     replay_adapters = Adapters(paper, paper, paper, SkippedGeoblock(), StdoutNotifier())
     return asyncio.run(run_replay(replay_adapters, DRY_RUN_CONFIG, read_replay(replay_path)))
