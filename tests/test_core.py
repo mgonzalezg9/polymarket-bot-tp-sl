@@ -56,6 +56,7 @@ from src.parse import (
     ShowOrders,
     ShowPositions,
     ShowPrice,
+    StopBot,
 )
 from tests.helpers import (
     ASSET_ID,
@@ -948,6 +949,29 @@ def test_open_position_rounds_max_price_down_and_averages_the_fill():
     assert state.positions[ASSET_ID] == Position(ASSET_ID, Decimal("140"), Decimal("75") / Decimal("140"))
     assert state.collateral_usdc == Decimal("980")
     assert commands == [Notify(CHAT_ID, "✅ /open will-x-happen Yes: bought 40 @ 0.5 for 20 USDC")]
+
+
+def test_exit_lists_dropped_triggers_and_exits_0():
+    triggers = (make_trigger(), make_trigger(trigger_id=2, status=TriggerStatus.FILLED))
+
+    _, commands = step(running_state_with_position(triggers=triggers), user_request(StopBot()))
+
+    assert commands == [
+        Notify(None, "👋 Exiting on /exit — trigger orders dropped: 1\n#1 SL 0.45/0.40 all will-x-happen Yes"),
+        Exit(0),
+    ]
+
+
+def test_exit_works_while_starting():
+    _, commands = step(make_state(status=BotStatus.RECONCILING), user_request(StopBot()))
+
+    assert commands == [Notify(None, "👋 Exiting on /exit — trigger orders dropped: 0"), Exit(0)]
+
+
+def test_exit_refused_while_order_in_flight():
+    _, commands = step(fired_state(), user_request(StopBot()))
+
+    assert commands == [Notify(CHAT_ID, "❌ an order is in flight, retry /exit in a moment")]
 
 
 def test_open_position_below_min_order_size_is_refused():

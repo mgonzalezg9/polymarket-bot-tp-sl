@@ -12,9 +12,11 @@ from src.parse import (
     SetStopLoss,
     SetTakeProfit,
     ShowHealth,
+    ShowHelp,
     ShowOrders,
     ShowPositions,
     ShowPrice,
+    StopBot,
     UserRequest,
 )
 
@@ -799,6 +801,10 @@ def _on_user_request(state: State, event: UserRequestReceived) -> Result:
     request, chat_id = event.request, event.chat_id
     if isinstance(request, ShowHealth):
         return state, [Notify(chat_id, fmt.render_health(state, event.at_ms))]
+    if isinstance(request, ShowHelp):
+        return state, [Notify(chat_id, fmt.render_help(state.config.close_slippage))]
+    if isinstance(request, StopBot):
+        return _stop_bot(state, chat_id)
     if state.status not in LIVE_STATUSES:
         return state, [Notify(chat_id, f"{fmt.EMOJI_FAILED} Bot is starting, retry in a moment")]
     subscribe_commands: list[Command] = []
@@ -847,6 +853,19 @@ def _on_user_request(state: State, event: UserRequestReceived) -> Result:
         case ClosePosition():
             state, commands = _close_position(state, event, request)
     return state, subscribe_commands + commands
+
+
+def _stop_bot(state: State, chat_id: int) -> Result:
+    # Exiting mid-order would lose its outcome.
+    if state.pending_orders:
+        return state, [Notify(chat_id, f"{fmt.EMOJI_FAILED} an order is in flight, retry /exit in a moment")]
+    dropped = [
+        f"{fmt.format_trigger(trigger)} {_label(state, trigger.asset_id)}"
+        for trigger in state.triggers.values()
+        if is_active(trigger)
+    ]
+    text = "\n".join([f"{fmt.EMOJI_EXIT} Exiting on /exit — trigger orders dropped: {len(dropped)}", *dropped])
+    return state, [Notify(None, text), Exit(0)]
 
 
 def _cache_market(state: State, market: MarketInfo, book: Book | None) -> Result:

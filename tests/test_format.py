@@ -9,10 +9,12 @@ from src.format import (
     EMOJI_PRICE,
     EMOJI_STALE,
     render_health,
+    render_help,
     render_orders,
     render_positions,
     render_price,
 )
+from src.parse import COMMANDS
 from tests.helpers import ASSET_ID, T0_MS, make_book, make_market, make_trigger, running_state_with_position
 
 OTHER_ASSET_ID = "987654321"
@@ -103,3 +105,11 @@ def test_render_price_shows_top_of_book_mid_spread_and_last_trade():
     assert one_sided.startswith(f"{EMOJI_PRICE} …654321")
     assert "Bid none" in one_sided
     assert "Mid n/a · spread n/a" in one_sided
+
+
+def test_render_help_documents_every_command_and_the_configured_slippage():
+    text = render_help(Decimal("0.03"))
+
+    for usage, _ in COMMANDS.values():
+        assert usage in text
+    assert "floor of bid minus 0.03" in text

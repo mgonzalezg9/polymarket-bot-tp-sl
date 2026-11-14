@@ -33,6 +33,8 @@ EMOJI_PRICE = "📈"
 EMOJI_HEALTH = "🩺"
 EMOJI_ORDERS = "📦"
 EMOJI_BACKLOG = "🧹"
+EMOJI_EXIT = "👋"
+EMOJI_HELP = "📖"
 
 
 def market_label(market: MarketInfo | None, asset_id: str) -> str:
@@ -81,6 +83,47 @@ def format_trigger(trigger: TriggerOrder) -> str:
 
 def _active_triggers(state: State) -> list[TriggerOrder]:
     return [trigger for trigger in state.triggers.values() if is_active(trigger)]
+
+
+def render_help(close_slippage: Decimal) -> str:
+    return f"""{EMOJI_HELP} Help
+<market> = asset id, Polymarket URL, or <slug> <outcome>
+Optional values are positional: to set shares on /tp, pass the floor too.
+
+/sl <market> <trigger> <floor> [shares] [sell|alert]
+• /sl will-trump-win-2028 yes 0.40 0.35
+  When the bid drops to 0.40 or lower, sells everything at a floor of 0.35.
+• /sl will-trump-win-2028 yes 0.40 0.35 50 alert
+  Covers 50 shares. With alert, a price gap only notifies you and does not sell.
+
+/tp <market> <trigger> [floor] [shares]
+• /tp will-trump-win-2028 yes 0.80
+  The floor defaults to the trigger.
+• /tp https://polymarket.com/event/… 0.80 0.78 25
+  Sets a floor of 0.78 and sells 25 shares.
+
+/open <market> <usdc> <max_price>
+• /open will-trump-win-2028 yes 20 0.55
+  FAK buy for 20 USDC, paying at most 0.55.
+
+/close <market> [shares] [floor]
+• /close will-trump-win-2028 yes
+  Sells everything at a floor of bid minus {format_price(close_slippage)}.
+• /close will-trump-win-2028 yes 10 0.48
+  Sells 10 shares at a floor of 0.48.
+
+/price <market>
+• /price will-trump-win-2028 yes
+
+/edit <id> <trigger> [floor]
+• /edit 3 0.42 0.38
+  Only works while the trigger is armed. Ids can be written 3 or #3.
+
+/cancel <id>
+• /cancel 3
+
+/positions · /orders · /health · /exit · /help
+  No arguments. /exit stops the bot and lists the trigger orders it drops."""
 
 
 def render_health(state: State, now_ms: int) -> str:

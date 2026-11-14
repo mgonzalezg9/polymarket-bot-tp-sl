@@ -102,6 +102,8 @@ on `/tp`, pass the floor too.
 | | `/edit 3 0.42 0.38` |
 | `/cancel <id>` | `/cancel 3` |
 | `/health` | `/health` |
+| `/exit` | `/exit` |
+| `/help` | `/help` |
 
 - A stop-loss gap policy of `sell` (the default) still sells when the market gaps through the trigger. `alert` only
   notifies you and cancels the trigger.
@@ -109,6 +111,7 @@ on `/tp`, pass the floor too.
 - The take-profit floor defaults to the trigger price.
 - `/open` refuses a buy below the market's min order size (`usdc / max_price` shares, usually 5).
 - `/edit` works only while a trigger is armed. Ids accept `3` or `#3`.
+- `/exit` stops the bot with exit code `0` and lists the trigger orders it drops. It waits while an order is in flight.
 
 Sample alerts from `replays/sl_gap.jsonl` (a stop-loss sells through a data gap, an `alert` stop-loss only warns):
 

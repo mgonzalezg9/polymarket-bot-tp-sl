@@ -12,9 +12,11 @@ from src.parse import (
     SetStopLoss,
     SetTakeProfit,
     ShowHealth,
+    ShowHelp,
     ShowOrders,
     ShowPositions,
     ShowPrice,
+    StopBot,
     parse_request,
 )
 
@@ -29,6 +31,8 @@ URL = MarketRef(url="https://polymarket.com/event/will-trump-win-2028")
         ("/health", ShowHealth()),
         ("/positions", ShowPositions()),
         ("/orders", ShowOrders()),
+        ("/exit", StopBot()),
+        ("/help", ShowHelp()),
         ("/price will-trump-win-2028 yes", ShowPrice(SLUG)),
         ("/price 7134921", ShowPrice(ASSET)),
         ("/price https://polymarket.com/event/will-trump-win-2028", ShowPrice(URL)),
@@ -116,10 +120,10 @@ def test_parse_request_numbers_are_decimal_not_float():
     assert result.amount_usdc == Decimal("20.10")
 
 
-@pytest.mark.parametrize("text", ["/unknown", "/help", "hello", ""])
+@pytest.mark.parametrize("text", ["/unknown", "/start", "hello", ""])
 def test_parse_request_unknown_command_lists_every_command(text):
     result = parse_request(text)
 
     assert isinstance(result, ParseError)
-    for command in ("/health", "/price", "/positions", "/open", "/close", "/sl", "/tp", "/orders", "/edit", "/cancel"):
+    for command in ("/health", "/price", "/positions", "/open", "/close", "/sl", "/tp", "/orders", "/edit", "/cancel", "/exit", "/help"):
         assert command in result.message

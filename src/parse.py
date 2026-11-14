@@ -76,6 +76,16 @@ class CancelTrigger:
 
 
 @dataclass(frozen=True)
+class StopBot:
+    pass
+
+
+@dataclass(frozen=True)
+class ShowHelp:
+    pass
+
+
+@dataclass(frozen=True)
 class ParseError:
     message: str
 
@@ -91,6 +101,8 @@ UserRequest = (
     | ShowOrders
     | EditTrigger
     | CancelTrigger
+    | StopBot
+    | ShowHelp
 )
 
 
@@ -231,6 +243,8 @@ COMMANDS: dict[str, tuple[str, Callable[[list[str]], UserRequest]]] = {
     "/orders": ("/orders", _without_arguments(ShowOrders())),
     "/edit": ("/edit <id> <trigger> [floor]", _parse_edit),
     "/cancel": ("/cancel <id>", _parse_cancel),
+    "/exit": ("/exit", _without_arguments(StopBot())),
+    "/help": ("/help", _without_arguments(ShowHelp())),
 }
 
 HELP_TEXT = "\n".join(
