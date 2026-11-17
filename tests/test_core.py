@@ -41,6 +41,7 @@ from src.core import (
     TriggerStatus,
     UserRequestReceived,
     is_active,
+    plan_trade,
     step,
     value_position,
 )
@@ -50,6 +51,7 @@ from src.parse import (
     EditTrigger,
     MarketRef,
     OpenPosition,
+    PlanTrade,
     SetStopLoss,
     SetTakeProfit,
     ShowHealth,
@@ -72,6 +74,7 @@ from tests.helpers import (
 )
 
 MARKET_REF = MarketRef(asset_id=ASSET_ID)
+PLAN = PlanTrade(MARKET_REF, Decimal("0.70"), Decimal("0.65"), Decimal("1"), Decimal("100"))
 
 
 def of_type(commands, command_type):
@@ -727,15 +730,28 @@ def test_show_requests_reply_with_rendered_text():
     _, health_commands = step(state, user_request(ShowHealth()))
     _, orders_commands = step(state, user_request(ShowOrders()))
     _, price_commands = step(state, market_request(ShowPrice(MARKET_REF)))
+    _, plan_commands = step(state, market_request(PLAN))
 
     for commands, emoji in (
         (health_commands, fmt.EMOJI_HEALTH),
         (orders_commands, fmt.EMOJI_ORDERS),
         (price_commands, fmt.EMOJI_PRICE),
+        (plan_commands, fmt.EMOJI_PLAN),
     ):
         [notify] = of_type(commands, Notify)
         assert notify.chat_id == CHAT_ID
         assert notify.text.startswith(emoji)
+        assert notify.monospace == (emoji == fmt.EMOJI_PLAN)
+
+
+def test_plan_with_prices_off_the_tick_grid_is_rejected():
+    request = PlanTrade(MARKET_REF, Decimal("0.705"), Decimal("0.65"), Decimal("1"), Decimal("100"))
+
+    state, commands = step(running_state_with_position(), market_request(request))
+
+    [notify] = of_type(commands, Notify)
+    assert notify.text == f"{fmt.EMOJI_FAILED} prices must be multiples of the tick size 0.01"
+    assert not notify.monospace
 
 
 def test_show_positions_fetches_then_replies_to_the_requesting_chat():
@@ -1088,3 +1104,34 @@ def test_value_position_without_bid_marks_at_zero():
     assert no_bid == no_book
     assert (no_bid.mark, no_bid.value, no_bid.pnl, no_bid.pnl_pct) == (0, 0, Decimal("-50"), Decimal("-100"))
     assert free.pnl_pct == 0
+
+
+def test_plan_trade_nets_taker_fees_on_entry_and_stop_loss_exit():
+    plan = plan_trade(PLAN, make_market(taker_fee_rate="0.04"))
+
+    assert (plan.entry_fee, plan.stop_loss_fee, plan.take_profit_fee) == (Decimal("1.2"), Decimal("1.3"), 0)
+    assert (plan.gross.ratio, plan.gross.break_even_pct.quantize(Decimal("0.01"))) == (6, Decimal("14.29"))
+    net = [plan.net.risk, plan.net.benefit, plan.net.ratio, plan.net.break_even_pct, plan.net.risk_pct]
+    assert [value.quantize(Decimal("0.01")) for value in net] == [
+        Decimal("9.64"),
+        Decimal("41.66"),
+        Decimal("4.32"),
+        Decimal("18.80"),
+        Decimal("9.64"),
+    ]
+
+
+def test_plan_trade_without_fees_has_equal_gross_and_net():
+    plan = plan_trade(PLAN, make_market())
+
+    assert plan.gross == plan.net
+
+
+def test_plan_trade_where_fees_exceed_the_benefit_has_no_ratio():
+    request = PlanTrade(MARKET_REF, Decimal("0.50"), Decimal("0.45"), Decimal("0.51"), Decimal("100"))
+
+    plan = plan_trade(request, make_market(taker_fee_rate="0.07"))
+
+    assert plan.gross.ratio == Decimal("0.2")
+    assert plan.net.benefit < 0
+    assert (plan.net.ratio, plan.net.break_even_pct) == (None, None)

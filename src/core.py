@@ -9,6 +9,7 @@ from src.parse import (
     ClosePosition,
     EditTrigger,
     OpenPosition,
+    PlanTrade,
     SetStopLoss,
     SetTakeProfit,
     ShowHealth,
@@ -58,6 +59,8 @@ class MarketInfo:
     tick_size: Decimal
     min_order_size: Decimal
     is_v2: bool
+    taker_fee_rate: Decimal = Decimal(0)
+    fee_exponent: Decimal = Decimal(1)
 
 
 @dataclass(frozen=True)
@@ -317,6 +320,7 @@ Event = (
 class Notify:
     chat_id: int | None  # None = broadcast
     text: str
+    monospace: bool = False  # one Telegram pre block, so tables align
 
 
 @dataclass(frozen=True)
@@ -414,6 +418,61 @@ def value_position(position: Position, book: Book | None) -> Valuation:
     pnl = value - cost
     pnl_pct = pnl / cost * 100 if cost else Decimal(0)
     return Valuation(mark=mark, value=value, cost=cost, pnl=pnl, pnl_pct=pnl_pct)
+
+
+@dataclass(frozen=True)
+class RiskReward:
+    risk: Decimal  # a positive amount
+    benefit: Decimal
+    risk_pct: Decimal
+    benefit_pct: Decimal
+    ratio: Decimal | None  # None when benefit <= 0
+    break_even_pct: Decimal | None
+
+
+@dataclass(frozen=True)
+class TradePlan:
+    shares: Decimal
+    gross: RiskReward
+    net: RiskReward
+    entry_fee: Decimal
+    stop_loss_fee: Decimal
+    take_profit_fee: Decimal
+
+
+def plan_trade(request: PlanTrade, market: MarketInfo) -> TradePlan:
+    shares = request.amount_usdc / request.entry_price
+
+    def taker_fee(price: Decimal) -> Decimal:
+        return shares * market.taker_fee_rate * (price * (1 - price)) ** market.fee_exponent
+
+    entry_fee = taker_fee(request.entry_price)
+    stop_loss_fee = taker_fee(request.stop_loss_price)
+    take_profit_fee = taker_fee(request.take_profit_price)
+    gross_risk = shares * (request.entry_price - request.stop_loss_price)
+    gross_benefit = shares * (request.take_profit_price - request.entry_price)
+    return TradePlan(
+        shares=shares,
+        gross=_risk_reward(gross_risk, gross_benefit, request.amount_usdc),
+        net=_risk_reward(
+            gross_risk + entry_fee + stop_loss_fee, gross_benefit - entry_fee - take_profit_fee, request.amount_usdc
+        ),
+        entry_fee=entry_fee,
+        stop_loss_fee=stop_loss_fee,
+        take_profit_fee=take_profit_fee,
+    )
+
+
+def _risk_reward(risk: Decimal, benefit: Decimal, stake: Decimal) -> RiskReward:
+    has_edge = benefit > 0
+    return RiskReward(
+        risk=risk,
+        benefit=benefit,
+        risk_pct=risk / stake * 100,
+        benefit_pct=benefit / stake * 100,
+        ratio=benefit / risk if has_edge else None,
+        break_even_pct=risk / (risk + benefit) * 100 if has_edge else None,
+    )
 
 
 TERMINAL_TRIGGER_STATUSES = frozenset({TriggerStatus.FILLED, TriggerStatus.FAILED, TriggerStatus.CANCELLED})
@@ -817,6 +876,14 @@ def _on_user_request(state: State, event: UserRequestReceived) -> Result:
             commands = [FetchPositions(chat_id)]
         case ShowPrice():
             commands = [Notify(chat_id, fmt.render_price(event.market, state.books[event.market.asset_id]))]
+        case PlanTrade():
+            market = event.market
+            if _off_tick(market.tick_size, request.entry_price, request.stop_loss_price, request.take_profit_price):
+                text = f"{fmt.EMOJI_FAILED} prices must be multiples of the tick size {market.tick_size}"
+                commands = [Notify(chat_id, text)]
+            else:
+                text = fmt.render_plan(market, state.books[market.asset_id], request, plan_trade(request, market))
+                commands = [Notify(chat_id, text, monospace=True)]
         case SetStopLoss():
             trigger = TriggerOrder(
                 trigger_id=state.next_trigger_id,
@@ -982,7 +1049,7 @@ def _trigger_error(state: State, trigger: TriggerOrder) -> str | None:
     if not 0 < trigger.floor_price <= trigger.trigger_price < 1:
         prices = f"trigger {trigger.trigger_price}, floor {trigger.floor_price}"
         return f"prices must satisfy 0 < floor <= trigger < 1 ({prices})"
-    if (trigger.trigger_price / tick_size) % 1 or (trigger.floor_price / tick_size) % 1:
+    if _off_tick(tick_size, trigger.trigger_price, trigger.floor_price):
         return f"prices must be multiples of the tick size {tick_size}"
     if position_size < min_order_size:
         return f"position {position_size} is below the min order size {min_order_size}"
@@ -1014,6 +1081,10 @@ LIVE_STATUSES = frozenset({BotStatus.RUNNING, BotStatus.STALE})
 
 def _name(trigger: TriggerOrder) -> str:
     return f"{trigger.kind} #{trigger.trigger_id}"
+
+
+def _off_tick(tick_size: Decimal, *prices: Decimal) -> bool:
+    return any((price / tick_size) % 1 for price in prices)
 
 
 def _is_through(kind: TriggerKind, trigger_price: Decimal, best_bid: Decimal) -> bool:

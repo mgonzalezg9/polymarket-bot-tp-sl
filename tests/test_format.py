@@ -1,20 +1,22 @@
 from dataclasses import replace
 from decimal import Decimal
 
-from src.core import Position, TriggerKind, TriggerStatus
+from src.core import Position, TriggerKind, TriggerStatus, plan_trade
 from src.format import (
     EMOJI_HEALTH,
     EMOJI_ORDERS,
+    EMOJI_PLAN,
     EMOJI_POSITIONS,
     EMOJI_PRICE,
     EMOJI_STALE,
     render_health,
     render_help,
     render_orders,
+    render_plan,
     render_positions,
     render_price,
 )
-from src.parse import COMMANDS
+from src.parse import COMMANDS, MarketRef, PlanTrade
 from tests.helpers import ASSET_ID, T0_MS, make_book, make_market, make_trigger, running_state_with_position
 
 OTHER_ASSET_ID = "987654321"
@@ -113,3 +115,53 @@ def test_render_help_documents_every_command_and_the_configured_slippage():
     for usage, _ in COMMANDS.values():
         assert usage in text
     assert "floor of bid minus 0.03" in text
+
+
+def plan_text(entry="0.70", stop_loss="0.65", take_profit="1", taker_fee_rate="0.04", book=None):
+    market = make_market(taker_fee_rate=taker_fee_rate)
+    request = PlanTrade(
+        MarketRef(asset_id=ASSET_ID), Decimal(entry), Decimal(stop_loss), Decimal(take_profit), Decimal("100")
+    )
+    return render_plan(market, book or make_book("0.69", "0.71"), request, plan_trade(request, market))
+
+
+def test_render_plan_shows_gross_and_net_table():
+    assert plan_text() == "\n".join(
+        [
+            f"{EMOJI_PLAN} Plan will-x-happen Yes",
+            "• Buy 142.857 shares at 0.70",
+            "  for 100.00 USDC",
+            "• SL 0.65 · TP 1 (resolution)",
+            "• Now bid 0.69 · ask 0.71",
+            "• Entry 0.70 is below ask 0.71:",
+            "  a FAK buy would not fill now",
+            "",
+            "              Gross      Net",
+            "Risk          -7.14    -9.64",
+            "Risk %       -7.14%   -9.64%",
+            "Benefit      +42.86   +41.66",
+            "Benefit %   +42.86%  +41.66%",
+            "R/R            6.00     4.32",
+            "Break-even   14.29%   18.80%",
+            "• Fees (rate 0.04): entry 1.20",
+            "  SL exit 1.30 · TP exit 0.00",
+        ]
+    )
+
+
+def test_render_plan_labels_no_stop_and_skips_the_warning_at_the_ask():
+    text = plan_text(entry="0.71", stop_loss="0", take_profit="0.90")
+
+    assert "• SL 0 (no stop) · TP 0.90\n" in text
+    assert "would not fill" not in text
+
+
+def test_render_plan_warns_without_ask():
+    assert "• No ask: a FAK buy would not fill now" in plan_text(book=make_book("0.69", None))
+
+
+def test_render_plan_shows_na_when_fees_exceed_the_benefit():
+    text = plan_text(entry="0.50", stop_loss="0.45", take_profit="0.51", taker_fee_rate="0.07")
+
+    assert "R/R            0.20      n/a" in text
+    assert "Break-even   83.33%      n/a" in text

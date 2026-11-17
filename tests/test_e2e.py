@@ -12,7 +12,7 @@ class RecordingNotifier:
     def __init__(self) -> None:
         self.sent: list[tuple[int | None, str]] = []
 
-    async def send(self, chat_id: int | None, text: str) -> None:
+    async def send(self, chat_id: int | None, text: str, monospace: bool = False) -> None:
         self.sent.append((chat_id, text))
 
     async def requests(self):

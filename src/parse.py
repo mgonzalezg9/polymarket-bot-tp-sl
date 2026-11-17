@@ -35,6 +35,15 @@ class OpenPosition:
 
 
 @dataclass(frozen=True)
+class PlanTrade:
+    market: MarketRef
+    entry_price: Decimal
+    stop_loss_price: Decimal  # 0 = no stop, held to resolution
+    take_profit_price: Decimal  # 1 = held to resolution
+    amount_usdc: Decimal
+
+
+@dataclass(frozen=True)
 class ClosePosition:
     market: MarketRef
     shares: Decimal | None = None  # None = whole position
@@ -95,6 +104,7 @@ UserRequest = (
     | ShowPrice
     | ShowPositions
     | OpenPosition
+    | PlanTrade
     | ClosePosition
     | SetStopLoss
     | SetTakeProfit
@@ -147,13 +157,24 @@ def _positional(args: list[str], required: tuple[str, ...], optional: tuple[str,
     return [*args, *[None] * (allowed - len(args))]
 
 
-def _number(token: str, name: str) -> Decimal:
+def _decimal(token: str, name: str) -> Decimal:
     try:
-        value = Decimal(token)
+        return Decimal(token)
     except InvalidOperation:
         raise _InvalidArguments(f"{name} must be a number, got {token}") from None
+
+
+def _number(token: str, name: str) -> Decimal:
+    value = _decimal(token, name)
     if not value.is_finite() or value <= 0:
         raise _InvalidArguments(f"{name} must be a positive number, got {token}")
+    return value
+
+
+def _probability(token: str, name: str) -> Decimal:
+    value = _decimal(token, name)
+    if not value.is_finite() or not 0 <= value <= 1:
+        raise _InvalidArguments(f"{name} must be between 0 and 1, got {token}")
     return value
 
 
@@ -222,6 +243,19 @@ def _parse_take_profit(args: list[str]) -> SetTakeProfit:
     return SetTakeProfit(market, trigger_price, _optional(_price, floor, "floor"), _optional(_number, shares, "shares"))
 
 
+def _parse_plan(args: list[str]) -> PlanTrade:
+    market, rest = _take_market(args)
+    entry, stop_loss, take_profit, usdc = _positional(rest, ("entry", "sl", "tp", "usdc"))
+    entry_price = _probability(entry, "entry")
+    stop_loss_price = _probability(stop_loss, "sl")
+    take_profit_price = _probability(take_profit, "tp")
+    if not stop_loss_price < entry_price < take_profit_price:
+        raise _InvalidArguments(
+            f"prices must satisfy 0 <= sl < entry < tp <= 1 (entry {entry}, sl {stop_loss}, tp {take_profit})"
+        )
+    return PlanTrade(market, entry_price, stop_loss_price, take_profit_price, _number(usdc, "usdc"))
+
+
 def _parse_edit(args: list[str]) -> EditTrigger:
     trigger_id, trigger, floor = _positional(args, ("id", "trigger"), ("floor",))
     return EditTrigger(_trigger_id(trigger_id), _price(trigger, "trigger"), _optional(_price, floor, "floor"))
@@ -240,6 +274,7 @@ COMMANDS: dict[str, tuple[str, Callable[[list[str]], UserRequest]]] = {
     "/close": ("/close <market> [shares] [floor]", _parse_close),
     "/sl": ("/sl <market> <trigger> <floor> [shares] [sell|alert]", _parse_stop_loss),
     "/tp": ("/tp <market> <trigger> [floor] [shares]", _parse_take_profit),
+    "/plan": ("/plan <market> <entry> <sl> <tp> <usdc>", _parse_plan),
     "/orders": ("/orders", _without_arguments(ShowOrders())),
     "/edit": ("/edit <id> <trigger> [floor]", _parse_edit),
     "/cancel": ("/cancel <id>", _parse_cancel),

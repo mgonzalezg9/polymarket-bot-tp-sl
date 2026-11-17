@@ -1,4 +1,5 @@
 import asyncio
+import json
 
 import httpx
 import pytest
@@ -40,3 +41,27 @@ def test_send_gives_up_after_max_attempts():
 
 def test_send_never_resends_once_the_request_may_have_arrived():
     assert post_attempts([httpx.ReadTimeout("slow")]) == 1
+
+
+def posted_json(**send_kwargs) -> dict:
+    posted: list[dict] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        posted.append(json.loads(request.content))
+        return httpx.Response(200, json={"ok": True})
+
+    async def send() -> None:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+            await TelegramNotifier("token", (1,), client).send(None, "🧮 a", **send_kwargs)
+
+    asyncio.run(send())
+    [body] = posted
+    return body
+
+
+def test_monospace_send_marks_the_chunk_as_pre_in_utf16_units():
+    assert posted_json(monospace=True)["entities"] == [{"type": "pre", "offset": 0, "length": 4}]
+
+
+def test_plain_send_has_no_entities():
+    assert "entities" not in posted_json()

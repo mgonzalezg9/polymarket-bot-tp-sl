@@ -37,5 +37,5 @@ class Geoblock(Protocol):
 
 
 class Notifier(Protocol):
-    async def send(self, chat_id: int | None, text: str) -> None: ...  # None = all whitelisted chats
+    async def send(self, chat_id: int | None, text: str, monospace: bool = False) -> None: ...  # None = all whitelisted chats
     def requests(self) -> AsyncIterator[tuple[int, str]]: ...  # (chat_id, text), whitelisted only
