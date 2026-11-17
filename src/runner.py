@@ -5,6 +5,8 @@ from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from typing import Any
 
+from polymarket.errors import PolymarketError
+
 from constants import EXIT_FLUSH_SECONDS, ORDER_TIMEOUT_SECONDS, READ_TIMEOUT_SECONDS, TICK_SECONDS
 from src.core import (
     BalanceFetchFailed,
@@ -175,7 +177,7 @@ class EventLoop:
         try:
             event = await asyncio.wait_for(coroutine, timeout)
         except Exception as error:
-            logger.warning("%s failed: %r", name, error, exc_info=not isinstance(error, TimeoutError))
+            logger.warning("%s failed: %r", name, error, exc_info=not isinstance(error, (TimeoutError, PolymarketError)))
             event = on_error(describe(error))
         self.queue.put_nowait(event)
 
