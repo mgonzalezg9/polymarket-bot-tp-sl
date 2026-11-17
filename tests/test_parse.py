@@ -42,6 +42,10 @@ URL = MarketRef(url="https://polymarket.com/event/will-trump-win-2028")
         ("/close 7134921 10", ClosePosition(ASSET, shares=Decimal("10"))),
         ("/close 7134921 10 0.48", ClosePosition(ASSET, shares=Decimal("10"), floor_price=Decimal("0.48"))),
         ("/sl will-trump-win-2028 yes 0.40 0.35", SetStopLoss(SLUG, Decimal("0.40"), Decimal("0.35"))),
+        (
+            "/sl cfb-frest-txst Texas State 0.40 0.35 alert",
+            SetStopLoss(MarketRef(slug="cfb-frest-txst", outcome="Texas State"), Decimal("0.40"), Decimal("0.35"), policy="alert"),
+        ),
         ("/sl 7134921 0.40 0.35 50", SetStopLoss(ASSET, Decimal("0.40"), Decimal("0.35"), size=Decimal("50"))),
         (
             "/sl 7134921 0.40 0.35 50 alert",
@@ -77,6 +81,7 @@ def test_parse_request_accepts_every_command_form(text, expected):
     [
         ("/price", "missing market"),
         ("/price will-trump-win-2028", "missing outcome after slug"),
+        ("/sl will-trump-win-2028 0.40 0.35", "missing outcome after slug"),
         ("/open 7134921 20", "missing max_price"),
         ("/sl 7134921 0.40", "missing floor"),
         ("/sl 7134921 alert", "missing trigger"),
