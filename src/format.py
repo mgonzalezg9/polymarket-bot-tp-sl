@@ -4,13 +4,16 @@ from decimal import Decimal
 from src.core import (
     Book,
     MarketInfo,
+    RiskReward,
     State,
+    TradePlan,
     TriggerOrder,
     TriggerStatus,
     is_active,
     remaining_shares,
     value_position,
 )
+from src.parse import PlanTrade
 
 EMOJI_STARTED = "🚀"
 EMOJI_ARMED = "🎯"
@@ -35,6 +38,9 @@ EMOJI_ORDERS = "📦"
 EMOJI_BACKLOG = "🧹"
 EMOJI_EXIT = "👋"
 EMOJI_HELP = "📖"
+EMOJI_PLAN = "🧮"
+
+PLAN_ROWS = ("Risk", "Risk %", "Benefit", "Benefit %", "R/R", "Break-even")
 
 
 def market_label(market: MarketInfo | None, asset_id: str) -> str:
@@ -101,6 +107,11 @@ Optional values are positional: to set shares on /tp, pass the floor too.
   The floor defaults to the trigger.
 • /tp https://polymarket.com/event/… 0.80 0.78 25
   Sets a floor of 0.78 and sells 25 shares.
+
+/plan <market> <entry> <sl> <tp> <usdc>
+• /plan will-trump-win-2028 yes 0.70 0.65 1 100
+  Read-only: risk, benefit and R/R for buying 100 USDC at 0.70, gross and net of taker fees.
+  sl 0 = no stop, tp 1 = held to resolution. Places no orders.
 
 /open <market> <usdc> <max_price>
 • /open will-trump-win-2028 yes 20 0.55
@@ -231,3 +242,43 @@ def render_price(market: MarketInfo, book: Book) -> str:
             f"Last trade {last_trade}",
         ]
     )
+
+
+def _plan_cells(view: RiskReward) -> tuple[str, ...]:
+    return (
+        f"{-view.risk:+.2f}",
+        f"{-view.risk_pct:+.2f}%",
+        f"{view.benefit:+.2f}",
+        f"{view.benefit_pct:+.2f}%",
+        "n/a" if view.ratio is None else f"{view.ratio:.2f}",
+        "n/a" if view.break_even_pct is None else f"{view.break_even_pct:.2f}%",
+    )
+
+
+def render_plan(market: MarketInfo, book: Book, request: PlanTrade, plan: TradePlan) -> str:
+    entry = format_price(request.entry_price)
+    stop_loss = format_price(request.stop_loss_price) + (" (no stop)" if request.stop_loss_price == 0 else "")
+    take_profit = format_price(request.take_profit_price) + (" (resolution)" if request.take_profit_price == 1 else "")
+    lines = [
+        f"{EMOJI_PLAN} Plan {market_label(market, market.asset_id)}",
+        f"• Buy {format_shares(plan.shares.quantize(Decimal('0.001')))} shares at {entry}",
+        f"  for {format_usdc(request.amount_usdc)} USDC",
+        f"• SL {stop_loss} · TP {take_profit}",
+        f"• Now bid {_book_level(book.best_bid, None)} · ask {_book_level(book.best_ask, None)}",
+    ]
+    if book.best_ask is None:
+        lines.append("• No ask: a FAK buy would not fill now")
+    elif request.entry_price < book.best_ask:
+        lines += [f"• Entry {entry} is below ask {format_price(book.best_ask)}:", "  a FAK buy would not fill now"]
+    # Single spaces keep columns apart when a value overflows its 8-character width.
+    lines += [
+        "",
+        f"{'':<10} {'Gross':>8} {'Net':>8}",
+        *(
+            f"{label:<10} {gross:>8} {net:>8}"
+            for label, gross, net in zip(PLAN_ROWS, _plan_cells(plan.gross), _plan_cells(plan.net), strict=True)
+        ),
+        f"• Fees (rate {format_price(market.taker_fee_rate)}): entry {format_usdc(plan.entry_fee)}",
+        f"  SL exit {format_usdc(plan.stop_loss_fee)} · TP exit {format_usdc(plan.take_profit_fee)}",
+    ]
+    return "\n".join(lines)

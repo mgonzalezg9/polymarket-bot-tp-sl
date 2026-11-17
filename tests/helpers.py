@@ -40,6 +40,8 @@ def make_market(
     tick_size: str = "0.01",
     min_order_size: str = "5",
     is_v2: bool = False,
+    taker_fee_rate: str = "0",
+    fee_exponent: str = "1",
 ) -> MarketInfo:
     return MarketInfo(
         asset_id=asset_id,
@@ -48,6 +50,8 @@ def make_market(
         tick_size=Decimal(tick_size),
         min_order_size=Decimal(min_order_size),
         is_v2=is_v2,
+        taker_fee_rate=Decimal(taker_fee_rate),
+        fee_exponent=Decimal(fee_exponent),
     )
 
 

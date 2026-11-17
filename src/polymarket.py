@@ -165,6 +165,8 @@ class PolymarketAdapter:
     async def _load_market(self, market: Market, outcome: MarketOutcome) -> tuple[MarketInfo, Book]:
         asset_id = trading_asset_id(market, outcome)
         order_book = await self._client.get_order_book(asset_id=asset_id)
+        # Only an explicit false disables fees: counting them by mistake overstates risk, never understates it.
+        fee_schedule = market.trading.fee_schedule if market.trading.fees_enabled is not False else None
         info = MarketInfo(
             asset_id=asset_id,
             slug=market.slug or "",
@@ -172,6 +174,8 @@ class PolymarketAdapter:
             tick_size=order_book.tick_size,
             min_order_size=order_book.min_order_size,
             is_v2=market.version == ProtocolVersion.V2,
+            taker_fee_rate=fee_schedule.rate if fee_schedule is not None else Decimal(0),
+            fee_exponent=Decimal(str(fee_schedule.exponent)) if fee_schedule is not None else Decimal(1),
         )
         if asset_id not in self._markets:
             self._record(

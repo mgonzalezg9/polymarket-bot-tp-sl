@@ -92,6 +92,7 @@ on `/tp`, pass the floor too.
 | | `/sl 7134…921 0.40 0.35 50 alert` |
 | `/tp <market> <trigger> [floor] [shares]` | `/tp will-trump-win-2028 yes 0.80` |
 | | `/tp https://polymarket.com/event/… 0.80 0.78 25` |
+| `/plan <market> <entry> <sl> <tp> <usdc>` | `/plan will-trump-win-2028 yes 0.70 0.65 1 100` |
 | `/open <market> <usdc> <max_price>` | `/open will-trump-win-2028 yes 20 0.55` |
 | `/close <market> [shares] [floor]` | `/close will-trump-win-2028 yes` |
 | | `/close will-trump-win-2028 yes 10 0.48` |
@@ -109,6 +110,8 @@ on `/tp`, pass the floor too.
   notifies you and cancels the trigger.
 - Omitting `shares` protects the whole position, measured when the trigger fires.
 - The take-profit floor defaults to the trigger price.
+- `/plan` is read-only: a table of risk, benefit, R/R and break-even win rate, gross and net of taker fees. `sl 0`
+  means no stop and `tp 1` means held to resolution. It places no orders.
 - `/open` refuses a buy below the market's min order size (`usdc / max_price` shares, usually 5).
 - `/edit` works only while a trigger is armed. Ids accept `3` or `#3`.
 - `/exit` stops the bot with exit code `0` and lists the trigger orders it drops. It waits while an order is in flight.

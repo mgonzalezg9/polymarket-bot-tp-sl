@@ -28,12 +28,16 @@ class TelegramNotifier:
         self._chat_ids = tuple(chat_ids)
         self._client = client
 
-    async def send(self, chat_id: int | None, text: str) -> None:
+    async def send(self, chat_id: int | None, text: str, monospace: bool = False) -> None:
         for target in self._chat_ids if chat_id is None else (chat_id,):
             for chunk in split_message(text):
-                await self._send_chunk(target, chunk)
+                await self._send_chunk(target, chunk, monospace)
 
-    async def _send_chunk(self, target: int, chunk: str) -> None:
+    async def _send_chunk(self, target: int, chunk: str, monospace: bool) -> None:
+        payload: dict = {"chat_id": target, "text": chunk}
+        if monospace:
+            # Entity offsets and lengths count UTF-16 code units: an emoji counts 2.
+            payload["entities"] = [{"type": "pre", "offset": 0, "length": len(chunk.encode("utf-16-le")) // 2}]
         for attempt in range(1, TELEGRAM_SEND_MAX_ATTEMPTS + 1):
             if attempt > 1:
                 await asyncio.sleep(TELEGRAM_RETRY_SECONDS)
@@ -41,7 +45,7 @@ class TelegramNotifier:
             try:
                 response = await self._client.post(
                     f"{self._base_url}/sendMessage",
-                    json={"chat_id": target, "text": chunk},
+                    json=payload,
                     timeout=READ_TIMEOUT_SECONDS,
                 )
                 if response.status_code != 200:
@@ -104,7 +108,7 @@ def _message(update: dict) -> tuple[int | None, str]:
 
 
 class StdoutNotifier:
-    async def send(self, chat_id: int | None, text: str) -> None:
+    async def send(self, chat_id: int | None, text: str, monospace: bool = False) -> None:
         print(f"[{'all' if chat_id is None else chat_id}] {text}")
 
     async def requests(self) -> AsyncIterator[tuple[int, str]]:

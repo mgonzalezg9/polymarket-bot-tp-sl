@@ -102,7 +102,7 @@ class EventLoop:
         adapters, at_ms = self.adapters, self.now_ms()
         match command:
             case Notify():
-                self.notify(command.chat_id, command.text)
+                self.notify(command.chat_id, command.text, command.monospace)
             case CheckGeoblock():
                 self.call(
                     adapters.geoblock.check(at_ms),
@@ -179,14 +179,16 @@ class EventLoop:
             event = on_error(describe(error))
         self.queue.put_nowait(event)
 
-    def notify(self, chat_id: int | None, text: str) -> None:
+    def notify(self, chat_id: int | None, text: str, monospace: bool = False) -> None:
         logger.info("Notify %s: %s", "all" if chat_id is None else chat_id, text)
-        self.last_notification = self.spawn(self._send_in_order(self.last_notification, chat_id, text))
+        self.last_notification = self.spawn(self._send_in_order(self.last_notification, chat_id, text, monospace))
 
-    async def _send_in_order(self, previous: asyncio.Task | None, chat_id: int | None, text: str) -> None:
+    async def _send_in_order(
+        self, previous: asyncio.Task | None, chat_id: int | None, text: str, monospace: bool
+    ) -> None:
         if previous is not None:
             await asyncio.wait([previous])
-        await self.adapters.notifier.send(chat_id, text)
+        await self.adapters.notifier.send(chat_id, text, monospace)
 
     async def settle(self) -> int | None:
         """Replay only: step every queued event and await its commands before the next one."""
