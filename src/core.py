@@ -608,13 +608,16 @@ def _on_positions_loaded(state: State, event: PositionsLoaded) -> Result:
     if state.status != BotStatus.RECONCILING:
         return state, [*commands, Notify(event.reply_chat_id, fmt.render_positions(state, event.at_ms))]
     unprotected = [
-        f"{_label(state, asset_id)} ({position.size} shares)"
+        f"• {_label(state, asset_id)} ({position.size} shares)"
         for asset_id, position in state.positions.items()
         if not _triggers_on(state, asset_id, ACTIVE_STATUSES)
     ]
-    started_text = (
-        f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted. "
-        f"Unprotected positions: {', '.join(unprotected) or 'none'}"
+    started_text = "\n".join(
+        [
+            f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted",
+            f"Unprotected positions: {len(unprotected) or 'none'}",
+            *unprotected,
+        ]
     )
     return replace(state, status=BotStatus.RUNNING), [*commands, Notify(None, started_text)]
 
@@ -940,7 +943,7 @@ def _stop_bot(state: State, chat_id: int) -> Result:
     if state.pending_orders:
         return state, [Notify(chat_id, f"{fmt.EMOJI_FAILED} an order is in flight, retry /exit in a moment")]
     dropped = [
-        f"{fmt.format_trigger(trigger)} {_label(state, trigger.asset_id)}"
+        f"• {fmt.format_trigger(trigger)} {_label(state, trigger.asset_id)}"
         for trigger in state.triggers.values()
         if is_active(trigger)
     ]

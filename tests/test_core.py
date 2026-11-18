@@ -178,10 +178,8 @@ def test_positions_loaded_starts_running_and_lists_unprotected_positions():
     assert state.subscribed_assets == {ASSET_ID, "456"}
     assert of_type(commands, Subscribe) == [Subscribe((ASSET_ID, "456"))]
     [text] = texts(commands)
-    assert text.startswith(
-        f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted. Unprotected positions:"
-    )
-    assert "will-x-happen Yes" in text and "will-y-happen No" in text
+    assert text.startswith(f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted\nUnprotected positions: 2\n")
+    assert "\n• will-x-happen Yes (100 shares)" in text and "\n• will-y-happen No" in text
 
 
 def test_fatal_error_halts_with_exit_2():
@@ -1000,7 +998,7 @@ def test_exit_lists_dropped_triggers_and_exits_0():
     _, commands = step(running_state_with_position(triggers=triggers), user_request(StopBot()))
 
     assert commands == [
-        Notify(None, "👋 Exiting on /exit — trigger orders dropped: 1\n#1 SL 0.45/0.40 all will-x-happen Yes"),
+        Notify(None, "👋 Exiting on /exit — trigger orders dropped: 1\n• #1 SL 0.45/0.40 all will-x-happen Yes"),
         Exit(0),
     ]
 

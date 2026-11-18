@@ -134,10 +134,10 @@ Sample `/orders` reply:
 
 ```
 📦 Orders
-#3 SL will-trump-win-2028 Yes · ARMED sell
+• #3 SL will-trump-win-2028 Yes · ARMED sell
   trigger 0.40 · floor 0.35 · size all · remaining 120
   bid 0.47 · distance +14.89%
-#4 TP will-trump-win-2028 Yes · ARMED sell
+• #4 TP will-trump-win-2028 Yes · ARMED sell
   trigger 0.80 · floor 0.78 · size 25 · remaining 25
   bid 0.47 · distance -70.21%
 ```
