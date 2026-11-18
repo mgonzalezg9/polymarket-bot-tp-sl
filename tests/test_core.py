@@ -1,7 +1,12 @@
 from dataclasses import replace
 from decimal import Decimal
 
-from constants import DELAYED_ORDER_POLL_SECONDS, POSITIONS_FETCH_MAX_ATTEMPTS, RECONCILE_LOOKBACK_SECONDS
+from constants import (
+    DELAYED_ORDER_POLL_SECONDS,
+    PENDING_ORDER_ALERT_SECONDS,
+    POSITIONS_FETCH_MAX_ATTEMPTS,
+    RECONCILE_LOOKBACK_SECONDS,
+)
 from src import format as fmt
 from src.core import (
     BalanceFetchFailed,
@@ -359,7 +364,7 @@ def test_fak_not_filled_returns_to_triggered_and_retries_on_next_book():
 
     assert state.triggers[1].status == TriggerStatus.TRIGGERED
     assert state.pending_orders == {}
-    assert commands == []
+    assert texts(commands) == ["❌ SL #1 will-x-happen Yes: order rejected (fak_not_filled) — retrying"]
 
     _, commands = step(state, book_at("0.44", at_ms=T0_MS + 3_000))
 
@@ -384,7 +389,10 @@ def test_not_enough_balance_returns_to_triggered_and_fetches_balance():
     state, commands = step(state, OrderRejected(T0_MS + 2_000, "r1", "not_enough_balance"))
 
     assert state.triggers[1].status == TriggerStatus.TRIGGERED
-    assert commands == [FetchBalance(ASSET_ID)]
+    assert commands == [
+        Notify(None, "❌ SL #1 will-x-happen Yes: order rejected (not_enough_balance) — retrying"),
+        FetchBalance(ASSET_ID),
+    ]
 
 
 def test_terminal_rejection_fails_trigger():
@@ -442,6 +450,25 @@ def test_non_final_poll_keeps_order_pending():
 
     assert commands == []
     assert "r1" in state.pending_orders
+
+
+def test_unresolved_order_alerts_once():
+    state, _ = step(fired_state(), OrderDelayed(T0_MS + 2_000, "r1", "order-1"))
+    alert_at_ms = T0_MS + 1_000 + PENDING_ORDER_ALERT_SECONDS * 1_000
+
+    def alerts(commands):
+        return [text for text in texts(commands) if text.startswith(fmt.EMOJI_GAP_ALERT)]
+
+    state, commands = step(state, Ticked(alert_at_ms - 1))
+    assert alerts(commands) == []
+
+    state, commands = step(state, Ticked(alert_at_ms))
+    assert alerts(commands) == [
+        f"⚠️ SL #1 will-x-happen Yes: order r1 unresolved after {PENDING_ORDER_ALERT_SECONDS}s, still checking"
+    ]
+
+    _, commands = step(state, Ticked(alert_at_ms + 10_000))
+    assert alerts(commands) == []
 
 
 def test_outcome_unknown_reconciles_and_never_resends():

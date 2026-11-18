@@ -36,6 +36,8 @@ Trigger orders live in memory only. A restart forgets them, and every start list
 - **One sell in flight per asset.** A second trigger on the same asset waits for the first order to resolve.
 - **No resend on unknown outcome.** A timed-out order is reconciled against your account trades before anything else
   is sent. There are no blind retries.
+- **Unresolved order alert.** An order still unresolved 60 s after it was sent is reported once; the bot keeps
+  checking it and never resends.
 - **Startup message.** Every start broadcasts which positions have no trigger protecting them.
 
 ## Setup
