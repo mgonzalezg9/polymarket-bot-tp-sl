@@ -153,12 +153,12 @@ def render_health(state: State, now_ms: int) -> str:
     return "\n".join(
         [
             f"{EMOJI_HEALTH} Health",
-            f"Status: {state.status}",
-            f"Feed: {feed}",
-            f"Oldest data (live triggers): {oldest_age}",
-            f"Last data: {'none' if last_data_ms is None else format_timestamp(last_data_ms)}",
-            f"Uptime: {format_duration(now_ms - state.started_at_ms)}",
-            f"Triggers: {armed_count} armed, {len(active)} active, {len(state.triggers)} total",
+            f"• Status: {state.status}",
+            f"• Feed: {feed}",
+            f"• Oldest data (live triggers): {oldest_age}",
+            f"• Last data: {'none' if last_data_ms is None else format_timestamp(last_data_ms)}",
+            f"• Uptime: {format_duration(now_ms - state.started_at_ms)}",
+            f"• Triggers: {armed_count} armed, {len(active)} active, {len(state.triggers)} total",
         ]
     )
 
@@ -181,7 +181,7 @@ def render_positions(state: State, now_ms: int) -> str:
                 mark += f" ({format_duration(age_ms)} old)"
         triggers = [format_trigger(trigger) for trigger in active if trigger.asset_id == asset_id]
         lines += [
-            market_label(state.markets.get(asset_id), asset_id),
+            f"• {market_label(state.markets.get(asset_id), asset_id)}",
             f"  {format_shares(position.size)} shares · avg {format_price(position.avg_price)} · mark {mark}",
             f"  value {format_usdc(valuation.value)} · PnL {valuation.pnl:+.2f} ({valuation.pnl_pct:+.2f}%)",
             f"  triggers: {', '.join(triggers) if triggers else 'none (unprotected)'}",
@@ -192,6 +192,7 @@ def render_positions(state: State, now_ms: int) -> str:
     total_pnl_pct = total_pnl / total_cost * 100 if total_cost else Decimal(0)
     collateral = "unknown" if state.collateral_usdc is None else format_usdc(state.collateral_usdc)
     lines += [
+        "",
         f"Total value {format_usdc(total_value)} · cost {format_usdc(total_cost)} · "
         f"PnL {total_pnl:+.2f} ({total_pnl_pct:+.2f}%)",
         f"USDC: {collateral}",
@@ -211,7 +212,7 @@ def render_orders(state: State) -> str:
         best_bid = book.best_bid if book else None
         bid = "no bid" if best_bid is None else format_price(best_bid)
         lines += [
-            f"#{trigger.trigger_id} {trigger.kind} {market_label(state.markets.get(trigger.asset_id), trigger.asset_id)}"
+            f"• #{trigger.trigger_id} {trigger.kind} {market_label(state.markets.get(trigger.asset_id), trigger.asset_id)}"
             f" · {trigger.status} {trigger.policy}",
             f"  trigger {format_price(trigger.trigger_price)} · floor {format_price(trigger.floor_price)}"
             f" · size {format_trigger_size(trigger)} · remaining {format_shares(remaining)}",
@@ -229,17 +230,17 @@ def _book_level(price: Decimal | None, size: Decimal | None) -> str:
 def render_price(market: MarketInfo, book: Book) -> str:
     bid, ask = book.best_bid, book.best_ask
     if bid is not None and ask is not None:
-        mid_spread = f"Mid {format_price((bid + ask) / 2)} · spread {format_price(ask - bid)}"
+        mid_spread = f"• Mid {format_price((bid + ask) / 2)} · spread {format_price(ask - bid)}"
     else:
-        mid_spread = "Mid n/a · spread n/a"
+        mid_spread = "• Mid n/a · spread n/a"
     last_trade = "n/a" if book.last_trade_price is None else format_price(book.last_trade_price)
     return "\n".join(
         [
             f"{EMOJI_PRICE} {market_label(market, market.asset_id)}",
-            f"Bid {_book_level(bid, book.best_bid_size)}",
-            f"Ask {_book_level(ask, book.best_ask_size)}",
+            f"• Bid {_book_level(bid, book.best_bid_size)}",
+            f"• Ask {_book_level(ask, book.best_ask_size)}",
             mid_spread,
-            f"Last trade {last_trade}",
+            f"• Last trade {last_trade}",
         ]
     )
 

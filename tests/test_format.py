@@ -46,12 +46,12 @@ def test_render_health_shows_status_feed_ages_and_trigger_counts():
     text = render_health(state, now_ms=T0_MS + 45_000)
 
     assert text.startswith(EMOJI_HEALTH)
-    assert "Status: RUNNING" in text
+    assert "\n• Status: RUNNING\n" in text
     assert f"{EMOJI_STALE} stale: 1 assets" in text
     assert "Oldest data (live triggers): 45s" in text
     assert "Last data: 2023-11-14 22:13:20 UTC" in text
     assert "Uptime: 1:00:45" in text
-    assert "Triggers: 1 armed, 2 active, 3 total" in text
+    assert "• Triggers: 1 armed, 2 active, 3 total" in text
 
 
 def test_render_positions_values_each_position_and_totals():
@@ -68,7 +68,7 @@ def test_render_positions_values_each_position_and_totals():
     text = render_positions(state, T0_MS + 45_000)
 
     assert text.startswith(EMOJI_POSITIONS)
-    assert "100 shares · avg 0.55 · mark 0.52" in text
+    assert "\n• will-x-happen Yes\n  100 shares · avg 0.55 · mark 0.52" in text
     assert "value 52.00 · PnL -3.00 (-5.45%)" in text
     assert "triggers: #1 SL 0.45/0.40 all, #2 TP 0.80/0.78 50" in text
     assert "#3" not in text
@@ -76,7 +76,7 @@ def test_render_positions_values_each_position_and_totals():
     assert "mark 0.52 (45s old)" in text
     assert "value 0.00 · PnL -3.00 (-100.00%)" in text
     assert "triggers: none (unprotected)" in text
-    assert "Total value 52.00 · cost 58.00 · PnL -6.00 (-10.34%)" in text
+    assert "\n\nTotal value 52.00 · cost 58.00 · PnL -6.00 (-10.34%)" in text
     assert "USDC: 1000.00" in text
 
 
@@ -84,7 +84,7 @@ def test_render_orders_lists_active_triggers_with_remaining_and_distance():
     text = render_orders(make_state_with_triggers())
 
     assert text.startswith(EMOJI_ORDERS)
-    assert "#1 SL will-x-happen Yes · ARMED sell" in text
+    assert "\n• #1 SL will-x-happen Yes · ARMED sell\n" in text
     assert "size all · remaining 100" in text
     assert "bid 0.52 · distance +13.46%" in text
     assert "#2 TP will-x-happen Yes · PARTIAL sell" in text
@@ -97,10 +97,10 @@ def test_render_price_shows_top_of_book_mid_spread_and_last_trade():
     text = render_price(make_market(), make_book("0.52", "0.54", best_bid_size="200", last_trade_price="0.53"))
 
     assert text.startswith(f"{EMOJI_PRICE} will-x-happen Yes")
-    assert "Bid 0.52 × 200" in text
+    assert "\n• Bid 0.52 × 200\n" in text
     assert "Ask 0.54 × 1000" in text
-    assert "Mid 0.53 · spread 0.02" in text
-    assert "Last trade 0.53" in text
+    assert "• Mid 0.53 · spread 0.02" in text
+    assert "• Last trade 0.53" in text
 
     one_sided = render_price(make_market(asset_id=OTHER_ASSET_ID, slug=""), make_book(None, "0.54"))
 

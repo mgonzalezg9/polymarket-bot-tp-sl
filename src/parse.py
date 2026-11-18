@@ -1,6 +1,7 @@
 from collections.abc import Callable
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from itertools import takewhile
 from typing import Literal
 
 
@@ -143,9 +144,19 @@ def _take_market(args: list[str]) -> tuple[MarketRef, list[str]]:
         return MarketRef(asset_id=first), args[1:]
     if first.lower().startswith("http"):
         return MarketRef(url=first), args[1:]
-    if len(args) < 2:
+    # ponytail: outcome runs until the first number, so labels like "Over 2.5" need the URL or asset id
+    words = list(takewhile(lambda arg: not _is_number(arg), args[1:]))
+    if not words:
         raise _InvalidArguments("missing outcome after slug")
-    return MarketRef(slug=first, outcome=args[1]), args[2:]
+    return MarketRef(slug=first, outcome=" ".join(words)), args[1 + len(words) :]
+
+
+def _is_number(token: str) -> bool:
+    try:
+        Decimal(token)
+    except InvalidOperation:
+        return False
+    return True
 
 
 def _positional(args: list[str], required: tuple[str, ...], optional: tuple[str, ...] = ()) -> list[str | None]:

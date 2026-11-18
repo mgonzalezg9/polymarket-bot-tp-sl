@@ -3,7 +3,12 @@ from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 from enum import StrEnum
 from typing import Literal
 
-from constants import DELAYED_ORDER_POLL_SECONDS, POSITIONS_FETCH_MAX_ATTEMPTS, RECONCILE_LOOKBACK_SECONDS
+from constants import (
+    DELAYED_ORDER_POLL_SECONDS,
+    PENDING_ORDER_ALERT_SECONDS,
+    POSITIONS_FETCH_MAX_ATTEMPTS,
+    RECONCILE_LOOKBACK_SECONDS,
+)
 from src.parse import (
     CancelTrigger,
     ClosePosition,
@@ -108,6 +113,7 @@ class PendingOrder:
     order_id: str | None = None  # known once the CLOB answered "delayed"
     outcome_unknown: bool = False
     last_check_ms: int = 0
+    stuck_notified: bool = False
 
 
 @dataclass(frozen=True)
@@ -602,13 +608,16 @@ def _on_positions_loaded(state: State, event: PositionsLoaded) -> Result:
     if state.status != BotStatus.RECONCILING:
         return state, [*commands, Notify(event.reply_chat_id, fmt.render_positions(state, event.at_ms))]
     unprotected = [
-        f"{_label(state, asset_id)} ({position.size} shares)"
+        f"• {_label(state, asset_id)} ({position.size} shares)"
         for asset_id, position in state.positions.items()
         if not _triggers_on(state, asset_id, ACTIVE_STATUSES)
     ]
-    started_text = (
-        f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted. "
-        f"Unprotected positions: {', '.join(unprotected) or 'none'}"
+    started_text = "\n".join(
+        [
+            f"{fmt.EMOJI_STARTED} Bot started — trigger orders are not persisted",
+            f"Unprotected positions: {len(unprotected) or 'none'}",
+            *unprotected,
+        ]
     )
     return replace(state, status=BotStatus.RUNNING), [*commands, Notify(None, started_text)]
 
@@ -665,6 +674,13 @@ def _check_pending_orders(state: State, at_ms: int) -> Result:
     commands: list[Command] = []
     pending_orders = dict(state.pending_orders)
     for request_id, pending in state.pending_orders.items():
+        if not pending.stuck_notified and at_ms - pending.sent_at_ms >= PENDING_ORDER_ALERT_SECONDS * 1000:
+            pending = pending_orders[request_id] = replace(pending, stuck_notified=True)
+            text = (
+                f"{fmt.EMOJI_GAP_ALERT} {_order_subject(state, pending)}: order {request_id} unresolved after "
+                f"{PENDING_ORDER_ALERT_SECONDS}s, still checking"
+            )
+            commands.append(Notify(pending.reply_chat_id, text))
         if pending.order_id is not None and at_ms - pending.last_check_ms >= poll_ms:
             commands.append(PollOrder(request_id, pending.order_id))
         elif pending.outcome_unknown and pending.last_check_ms == 0:
@@ -807,20 +823,20 @@ def _on_order_rejected(state: State, event: OrderRejected) -> Result:
     if pending is None:
         return state, []
     state = _drop_pending(state, event.request_id)
-    label = _label(state, pending.asset_id)
+    subject = _order_subject(state, pending)
     commands: list[Command] = [FetchBalance(pending.asset_id)] if event.code == "not_enough_balance" else []
     if pending.trigger_id is None:
-        request_name = "/open" if pending.side == "BUY" else "/close"
         return state, [
-            Notify(pending.reply_chat_id, f"{fmt.EMOJI_FAILED} {request_name} {label} rejected: {event.code}"),
+            Notify(pending.reply_chat_id, f"{fmt.EMOJI_FAILED} {subject} rejected: {event.code}"),
             *commands,
         ]
     trigger = state.triggers[pending.trigger_id]
     if event.code in ("fak_not_filled", "not_enough_balance"):
-        return _put_trigger(state, replace(trigger, status=_firing_status(trigger))), commands
+        retrying = Notify(None, f"{fmt.EMOJI_FAILED} {subject}: order rejected ({event.code}) — retrying")
+        return _put_trigger(state, replace(trigger, status=_firing_status(trigger))), [retrying, *commands]
     failed = replace(trigger, status=TriggerStatus.FAILED, close_reason=event.code)
     return _put_trigger(state, failed), [
-        Notify(None, f"{fmt.EMOJI_FAILED} {_name(trigger)} {label}: order rejected ({event.code}) — trigger failed")
+        Notify(None, f"{fmt.EMOJI_FAILED} {subject}: order rejected ({event.code}) — trigger failed")
     ]
 
 
@@ -927,7 +943,7 @@ def _stop_bot(state: State, chat_id: int) -> Result:
     if state.pending_orders:
         return state, [Notify(chat_id, f"{fmt.EMOJI_FAILED} an order is in flight, retry /exit in a moment")]
     dropped = [
-        f"{fmt.format_trigger(trigger)} {_label(state, trigger.asset_id)}"
+        f"• {fmt.format_trigger(trigger)} {_label(state, trigger.asset_id)}"
         for trigger in state.triggers.values()
         if is_active(trigger)
     ]
@@ -1160,6 +1176,14 @@ def _reconcile_command(state: State, pending: PendingOrder) -> ReconcileFills:
 
 def _label(state: State, asset_id: str) -> str:
     return fmt.market_label(state.markets.get(asset_id), asset_id)
+
+
+def _order_subject(state: State, pending: PendingOrder) -> str:
+    if pending.trigger_id is not None:
+        name = _name(state.triggers[pending.trigger_id])
+    else:
+        name = "/open" if pending.side == "BUY" else "/close"
+    return f"{name} {_label(state, pending.asset_id)}"
 
 
 def _triggers_on(state: State, asset_id: str, statuses: frozenset[TriggerStatus]) -> list[TriggerOrder]:
